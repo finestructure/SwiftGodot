@@ -80,6 +80,27 @@ open class Wrapped: Equatable, Identifiable, Hashable {
         hasher.combine(handle)
     }
     
+    /// This method returns the list of StringNames for methods that the class overwrites, and
+    /// is necessary to ensure that Godot knows which methods have been overwritten, and which
+    /// ones Godot will provide a default behavior for.
+    ///
+    /// This is necessary because the Godot overwrite method does not surface a "base" behavior
+    /// that can be called into.  Instead Godot relies on the "Is the method implemented or not"
+    /// to make this determination.
+    ///
+    /// If you are not using the `@Godot` macro, you should overwrite this function and return
+    /// the StringNames for the functions you override, like in this example, where we indicate
+    /// that we override the Godot `_has_point` method:
+    ///
+    /// ```
+    /// open override func implementedOverrides() -> [StringName] {
+    ///     return super.implementedOverrides + [StringName ("_has_point")]
+    /// }
+    /// ```
+    open class func implementedOverrides() -> [StringName] {
+        []
+    }
+
     class func getVirtualDispatcher(name: StringName) ->  GDExtensionClassCallVirtual? {
         print ("SWARN: getVirtualDispatcher (\"\(name)\") reached Wrapped on class \(self)")
         return nil
@@ -233,15 +254,15 @@ func objectFromHandle (nativeHandle: UnsafeRawPointer) -> Wrapped? {
     return nil
 }
 
-func lookupObject<T:GodotObject> (nativeHandle: UnsafeRawPointer) -> T {
+func lookupObject<T:GodotObject> (nativeHandle: UnsafeRawPointer) -> T? {
     if let a = objectFromHandle(nativeHandle: nativeHandle) {
-        return a as! T
+        return a as? T
     }
     let _result: GString = GString ()
     let copy = nativeHandle
     gi.object_method_bind_ptrcall (Object.method_get_class, UnsafeMutableRawPointer (mutating: copy), nil, &_result.content)
     if let ctor = godotFrameworkCtors [_result.description] {
-        return ctor.init (nativeHandle: nativeHandle) as! T
+        return ctor.init (nativeHandle: nativeHandle) as? T
     }
     print ("Could not find class \(_result.description), fallback to creating a \(T.self)")
     return T.init (nativeHandle: nativeHandle)
@@ -329,7 +350,9 @@ func frameworkTypeBindingFree (_ token: UnsafeMutableRawPointer?, _ instance: Un
             print ("SWIFT ERROR: attempt to release framework object we were not aware of: \(String(describing: instance))")
         }
     }
-
+    if let binding {
+        Unmanaged<Wrapped>.fromOpaque(binding).release()
+    }
 }
 
 func frameworkTypeBindingReference(_ x: UnsafeMutableRawPointer?, _ y: UnsafeMutableRawPointer?, _ z: UInt8) -> UInt8 {

@@ -130,7 +130,7 @@ func generateVirtualProxy (_ p: Printer,
                 if hasSubclasses.contains(cdef.name) {
                     // If the type we are bubbling up has subclasses, we want to create the most
                     // derived type if possible, so we perform the longer lookup
-                    handleResolver = "lookupObject (nativeHandle: resolved_\(i))"
+                    handleResolver = "lookupObject (nativeHandle: resolved_\(i))!"
                 } else {
                     // There are no subclasses, so we can create the object right away
                     handleResolver = "\(arg.type) (nativeHandle: resolved_\(i))"
@@ -246,6 +246,7 @@ func generateMethods (_ p: Printer,
     
     if virtuals.count > 0 {
         p ("override class func getVirtualDispatcher (name: StringName) -> GDExtensionClassCallVirtual?"){
+            p ("guard implementedOverrides().contains(name) else { return nil }")
             p ("switch name.description") {
                 for name in virtuals.keys.sorted() {
                     p ("case \"\(name)\":")
@@ -675,6 +676,7 @@ func processClass (cdef: JGodotExtensionAPIClass, outputDir: String?) async {
             p ("/// when you create a subclass of this type.")
             p ("public required init ()") {
                 p ("super.init (name: StringName (\"\(cdef.name)\"))")
+                p ("let _ = Self.classInitializer")
             }
         } else {
             p ("/// This class can not be instantiated by user code")
@@ -709,6 +711,10 @@ func processClass (cdef: JGodotExtensionAPIClass, outputDir: String?) async {
         // Remove code that we did not want generated
         if okList.count > 0 && !okList.contains (cdef.name) {
             p.result = oResult
+        }
+        
+        if cdef.name == "Object" {
+            p ("open class var classInitializer: Void { () }")
         }
     }
 

@@ -30,20 +30,48 @@ final class MacroGodotTests: XCTestCase {
             """,
             expandedSource: """
             class Hi: Node {
-
-                required init(nativeHandle _: UnsafeRawPointer) {
-                	fatalError("init(nativeHandle:) called, it is a sign that something is wrong, as these objects should not be re-hydrated")
+            
+                override open class var classInitializer: Void {
+                    let _ = super.classInitializer
+                    return _initializeClass
                 }
-
-                required init() {
-                	_ = Hi._initClass
-                	super.init ()
-                }
-
-                static var _initClass: Void = {
+            
+                private static var _initializeClass: Void = {
                     let className = StringName("Hi")
                     let classInfo = ClassInfo<Hi> (name: className)
                 } ()
+            }
+            """,
+            macros: testMacros
+        )
+    }
+    
+    func testGodotVirtualMethodsMacro() {
+        assertMacroExpansion(
+            """
+            @Godot class Hi: Control {
+                override func _hasPoint(_ point: Vector2) -> Bool { false }
+            }
+            """,
+            expandedSource: """
+            class Hi: Control {
+                override func _hasPoint(_ point: Vector2) -> Bool { false }
+            
+                override open class var classInitializer: Void {
+                    let _ = super.classInitializer
+                    return _initializeClass
+                }
+            
+                private static var _initializeClass: Void = {
+                    let className = StringName("Hi")
+                    let classInfo = ClassInfo<Hi> (name: className)
+                } ()
+            
+                override open class func implementedOverrides() -> [StringName] {
+                    super.implementedOverrides() + [
+                    	StringName("_has_point"),
+                    ]
+                }
             }
             """,
             macros: testMacros
@@ -65,16 +93,12 @@ final class MacroGodotTests: XCTestCase {
             	func hi() {
             	}
             
-                required init(nativeHandle _: UnsafeRawPointer) {
-                	fatalError("init(nativeHandle:) called, it is a sign that something is wrong, as these objects should not be re-hydrated")
+                override open class var classInitializer: Void {
+                    let _ = super.classInitializer
+                    return _initializeClass
                 }
-
-                required init() {
-                	_ = Hi._initClass
-                	super.init ()
-                }
-
-                static var _initClass: Void = {
+            
+                private static var _initializeClass: Void = {
                     let className = StringName("Hi")
                     let classInfo = ClassInfo<Hi> (name: className)
                 } ()
@@ -102,16 +126,12 @@ final class MacroGodotTests: XCTestCase {
                 static let differentInit = SignalWithNoArguments("different_init")
                 static let differentInit2 = SignalWithNoArguments("different_init2")
 
-                required init(nativeHandle _: UnsafeRawPointer) {
-                	fatalError("init(nativeHandle:) called, it is a sign that something is wrong, as these objects should not be re-hydrated")
+                override open class var classInitializer: Void {
+                    let _ = super.classInitializer
+                    return _initializeClass
                 }
-
-                required init() {
-                	_ = Hi._initClass
-                	super.init ()
-                }
-
-                static var _initClass: Void = {
+            
+                private static var _initializeClass: Void = {
                     let className = StringName("Hi")
                     let classInfo = ClassInfo<Hi> (name: className)
                     classInfo.registerSignal(name: Hi.pickedUpItem.name, arguments: Hi.pickedUpItem.arguments)
@@ -129,35 +149,53 @@ final class MacroGodotTests: XCTestCase {
 		// Note when editing: Xcode loves to change all indentation to be consistent as either tabs or spaces, but the macro expansion produces a mix.
 		// I had to set Settings->Text Editing->Tab Key to "Inserts a Tab Character" in order to resolve this.
 		assertMacroExpansion(
-			"""
-			@Godot class Castro: Node {
-				@Callable func deleteEpisode() {
-				}
-			}
-			""",
+            """
+            @Godot class Castro: Node {
+                @Callable func deleteEpisode() {}
+                @Callable func subscribe(podcast: Podcast) {}
+                @Callable func removeSilences(from: Variant) {}
+            }
+            """,
             expandedSource: """
             class Castro: Node {
-            	func deleteEpisode() {
-            	}
+                func deleteEpisode() {}
             
-            	func _mproxy_deleteEpisode (args: [Variant]) -> Variant? {
-            		deleteEpisode ()
-            		return nil
-            	}
+                func _mproxy_deleteEpisode (args: [Variant]) -> Variant? {
+                	deleteEpisode ()
+                	return nil
+                }
+                func subscribe(podcast: Podcast) {}
             
-                required init(nativeHandle _: UnsafeRawPointer) {
-                	fatalError("init(nativeHandle:) called, it is a sign that something is wrong, as these objects should not be re-hydrated")
+                func _mproxy_subscribe (args: [Variant]) -> Variant? {
+                	subscribe (podcast: Podcast.makeOrUnwrap (args [0])!)
+                	return nil
                 }
-
-                required init() {
-                	_ = Castro._initClass
-                	super.init ()
+                func removeSilences(from: Variant) {}
+            
+                func _mproxy_removeSilences (args: [Variant]) -> Variant? {
+                	removeSilences (from: args [0])
+                	return nil
                 }
-
-                static var _initClass: Void = {
+            
+                override open class var classInitializer: Void {
+                    let _ = super.classInitializer
+                    return _initializeClass
+                }
+            
+                private static var _initializeClass: Void = {
                     let className = StringName("Castro")
                     let classInfo = ClassInfo<Castro> (name: className)
                 	classInfo.registerMethod(name: StringName("deleteEpisode"), flags: .default, returnValue: nil, arguments: [], function: Castro._mproxy_deleteEpisode)
+                    let prop_0 = PropInfo (propertyType: .object, propertyName: "Podcast", className: className, hint: .none, hintStr: "", usage: .default)
+                	let subscribeArgs = [
+                		prop_0,
+                	]
+                	classInfo.registerMethod(name: StringName("subscribe"), flags: .default, returnValue: nil, arguments: subscribeArgs, function: Castro._mproxy_subscribe)
+                    let prop_1 = PropInfo (propertyType: .object, propertyName: "Variant", className: className, hint: .none, hintStr: "", usage: .default)
+                	let removeSilencesArgs = [
+                		prop_1,
+                	]
+                	classInfo.registerMethod(name: StringName("removeSilences"), flags: .default, returnValue: nil, arguments: removeSilencesArgs, function: Castro._mproxy_removeSilences)
                 } ()
             }
             """,
@@ -186,16 +224,12 @@ final class MacroGodotTests: XCTestCase {
             	    return Variant (goodName)
             	}
             
-                required init(nativeHandle _: UnsafeRawPointer) {
-                	fatalError("init(nativeHandle:) called, it is a sign that something is wrong, as these objects should not be re-hydrated")
+                override open class var classInitializer: Void {
+                    let _ = super.classInitializer
+                    return _initializeClass
                 }
             
-                required init() {
-                	_ = Hi._initClass
-                	super.init ()
-                }
-            
-                static var _initClass: Void = {
+                private static var _initializeClass: Void = {
                     let className = StringName("Hi")
                     let classInfo = ClassInfo<Hi> (name: className)
                     let _pgoodName = PropInfo (
